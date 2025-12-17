@@ -1,0 +1,332 @@
+---
+title: "Support Vector Regression - Mathematical Overview"
+author: "Luisa Kalkert"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+
+
+To understand how support vector machine are applied for regression, we need to understand the support vector machine for classification first which in turn build upon Support Vector Classifiers.
+
+
+## Support Vector Classifiers
+
+
+```{r, fig.width=10, fig.height=4, out.width='100%', fig.align='center'}
+
+set.seed(123)
+
+class1 <- data.frame(
+  x = rnorm(50, mean = 2.3, sd = 1.5), 
+  y = rnorm(50, mean = 1.5),
+  class = factor("Class 1")
+)
+class2 <- data.frame(
+  x = rnorm(50, mean = 3.2, sd = 1.5), 
+  y = rnorm(50, mean = 4),
+  class = factor("Class 2")
+)
+df <- rbind(class1, class2)
+
+library(e1071)
+library(ggplot2)
+library(gridExtra)  # for arranging multiple plots side by side
+
+# Fit a soft-margin SVM classifier (controlled by the cost parameter)
+svm_model <- svm(class ~ x + y,
+                 data   = df,
+                 kernel = "linear",
+                 cost   = 1,
+                 scale  = TRUE)
+
+
+
+# Create a grid and compute decision values to draw only the decision boundary line
+x_seq <- seq(min(df$x) - 1, max(df$x) + 1, length.out = 100)
+y_seq <- seq(min(df$y) - 1, max(df$y) + 1, length.out = 100)
+grid  <- expand.grid(x = x_seq, y = y_seq)
+
+grid_pred      <- predict(svm_model, grid, decision.values = TRUE)
+decision_vals  <- attributes(grid_pred)$decision.values
+grid$decision  <- decision_vals
+
+# Plot the data and only the separating line (no soft-margin boundary lines, legend hidden)
+p1 <- ggplot(df, aes(x = x, y = y, color = class)) +
+  geom_point() +
+  geom_contour(data = grid,
+               aes(z = decision),
+               breaks = 0,
+               color = "black") +
+  labs(
+    title = "SVM with linear decision boundary",
+    x = "x",
+    y = "y"
+  ) +
+  theme(legend.position = "none")
+
+set.seed(12)
+
+class1 <- data.frame(
+  x = rnorm(10, mean = 2.3, sd = 1.5), 
+  y = rnorm(10, mean = 1.5),
+  class = factor("Class 1")
+)
+class2 <- data.frame(
+  x = rnorm(10, mean = 3.2, sd = 1.5), 
+  y = rnorm(10, mean = 4),
+  class = factor("Class 2")
+)
+df <- rbind(class1, class2)
+
+# Fit a soft-margin SVM classifier for this smaller data set
+svm_model_small <- svm(class ~ x + y,
+                       data   = df,
+                       kernel = "linear",
+                       cost   = 1,
+                       scale  = TRUE)
+
+# Mark the support vectors in the data
+df$support_vector <- FALSE
+df$support_vector[svm_model_small$index] <- TRUE
+
+# Create a grid and compute decision values to draw the decision boundary and soft-margin lines
+x_seq <- seq(min(df$x) - 1, max(df$x) + 1, length.out = 100)
+y_seq <- seq(min(df$y) - 1, max(df$y) + 1, length.out = 100)
+grid  <- expand.grid(x = x_seq, y = y_seq)
+
+grid_pred      <- predict(svm_model_small, grid, decision.values = TRUE)
+decision_vals  <- attributes(grid_pred)$decision.values
+grid$decision  <- decision_vals
+
+# Plot the data, decision boundary, soft-margin boundary lines, and highlight support vectors
+p2 <- ggplot(df, aes(x = x, y = y, color = class)) +
+  geom_point() +
+  # highlight support vectors (points on or inside the margin)
+  geom_point(data = df[df$support_vector, ],
+             shape = 21,
+             size = 3,
+             stroke = 1,
+             color = "black",
+             fill = "#ffffff00") +
+  # decision boundary (f(x) = 0)
+  geom_contour(data = grid,
+               aes(z = decision),
+               breaks = 0,
+               color = "black") +
+  # soft-margin boundaries (f(x) = -1 and f(x) = 1)
+  geom_contour(data = grid,
+               aes(z = decision),
+               breaks = c(-1, 1),
+               linetype = "dashed",
+               color = "black") +
+  labs(
+    title = "Soft-margin and support vectors highlighted",
+    x = "x",
+    y = "y"
+  ) +
+  theme(legend.position = "none")
+
+# Print p1 and p2 side by side
+grid.arrange(p1, p2, ncol = 2)
+
+
+```
+
+
+Support vector classifiers seperate the feature vectors of two classes by a drawing a linear decision boundary in the form of a hyperplane in the feature space. In 2D this is a line seperating the classes, in 3D a plane, and in d dimensions a d-1 - dimensional hyperplane. 
+Usually in real world scenario, classes are not perfectly separable through a linear boundary (Or even when they are, the perfect seperation might not be the most desireable). So a hyperplane is choosen to seperate the classes in an optimal way. To do this, an optimization problem is constructed. 
+
+Roughly speaking a intuition for this is as follows:
+Choose a hyperplane to seperate the classes and draw a margin around the hyperplane. Choose the hyperplane to have a margin that is as big as possible while also making sure as many observations as possible fall outside of the margine on the correct side of the hyperplane. For observations that fall inside of the margin or even outside on the incorrect side of the hyperplane, try to make sure they are as close as possible to the correct side.
+
+The hyperplane $A$ in $\mathbb{R}^p$ can be defined as 
+
+$A = \{x \in \mathbb{R}^p \mid \langle x, \beta \rangle = x_1 \beta_1 + \dots + x_p \beta_p + \beta_0 = 0,\ \beta \in \mathbb{R}^p,\ \beta_0 \in \mathbb{R} \}.$
+
+Let $x_{i1}, \dots, x_{ip}$ be the features of the $i$-th observation with $i \in \{1, \dots, n\}$. Let $y_i$ be the label of the $i$-th observation, with $y_i = 1$ if observation $i$ belongs to class 1 and $y_i = -1$ if it belongs to class 2.
+We now try to find the solution to a constraint optimization problem. We want to determine coefficients $\beta_1, \dots, \beta_p$ of the hyperplane, slack variables $\varepsilon_1, \dots, \varepsilon_n$, and a margin $M$ in a way that maximizes $M$, while also satisfying:
+
+$y_i(\beta_0 + \beta_1 x_{i1} + \dots + \beta_p x_{ip}) \ge M (1 - \varepsilon_i)$ (1.) Note how this expands the definition of $A$ to include the sign of the observation with the factor $y_i$, the margin $M$ and the slack term $(1 - \varepsilon_i)$.
+At the same time, we are restricting the slack variables with 
+$\varepsilon_i \ge 0$ for all $i$ and $\sum_{i=1}^n \varepsilon_i \le C$ (2.) 
+and restricting the betas to $\sum_{j=1}^p \beta_j^2 = 1$ (3.)
+
+
+The encoding (0.) is necessary to ensure observations on the wrong side of margin are contributing negative while those on the correct side contribute positive, for both classes symmetrically. 
+
+(1.) defines the margin around the hyperplane with slack. In the basic case, if we have perfectly separable classes and $C = 0$ (so the factor $1 - \varepsilon_i$ is $1$ for all $i$), $M$ defines the minimal distance of any observation to the hyperplane. We therefore try to maximize the minimal distance of any observation to the hyperplane.
+
+However, as classes are typically not perfectly seperable, we need to adjust using by adding the slack term $1 - \varepsilon_i$. This allows some observations to fall inside of the margin or even on the wrong side of the decision boundary. This also allows for more "wiggle room" for the position of the hyperplane and hence for more stable classifiers.
+The choice of the $\varepsilon$ (and hence of the parameter $C$) determines the amount of margin violation that is allowed. A smaller $C$ generally allows for less slack and increases variance and reduces bias, while a larger $C$ tends to increase bias and reduce variance.
+
+The name _support vector_ machine comes from the property of SVMs that only some observations influence the model. These "support vectors" are the observations that lie on the boundary of the margin, inside of the margin or on the incorrect side of the margin.
+
+
+## Support Vector Machines for Classification
+
+To generalize to a non-linear decision boundary, not only the features are used, but also kernels of the features. This could be polynomial features, e.g. $X_i^2$ or also complex functions like a gaussian kernel.  
+
+
+
+## Support Vector Machines for Regression
+
+```{r, fig.width=10, fig.height=6, out.width='100%', fig.align='center'}
+set.seed(123)
+
+
+x <- seq(-10, 10, 0.5) + rnorm(length(seq(-10, 10, 0.5)), mean = 0, sd = 0.1)
+y <- 1/170 * (x^3 - 3* x^2 - 70*x + 5 + rnorm(length(x), mean = 0, sd = 170))
+
+library(e1071)
+
+epsilon <- 1
+cost <- 1
+
+model <- svm(y ~ x, data = data.frame(x = x, y = y), epsilon = epsilon, cost = cost)
+predictedY <- predict(model, data.frame(x = x))
+
+plot(x, y, pch = 16, col = "grey70")
+lines(x, predictedY, col = "darkgreen")
+
+
+# Add ε-tube
+polygon(
+ c(x, rev(x)),
+ c(predictedY + epsilon, rev(predictedY - epsilon)),
+ border = NA,
+ col = rgb(1, 0, 0, 0.15)
+)
+
+# mark the 17 points that are the furthest from the predictedY 
+idx_furthest <- order(abs(predictedY - y), decreasing = TRUE)[1:17]
+points(x[idx_furthest], y[idx_furthest], 
+       col = "#000000", 
+       bg = "#ffffff00",
+       pch = 21,
+       cex = 1.6,
+       lwd = 1)
+
+
+# Add an arrow (dashed, double sided, between ypred at x = 10 and ypred at x = 10   + 1 )
+arrows(10, predictedY[length(predictedY)], 10, predictedY[length(predictedY)] + epsilon, length = 0.1, lty = 2, col = "black", code = 3)
+# add a text "ε" at the end of the arrow
+text(10.01, predictedY[length(predictedY)] + 1/2 * epsilon, "ε", pos = 4)
+
+# Add an arrow between 5,-5 and 5,-2.5 with text xsi_i star (flipped direction)
+arrows(5.05, -4, 5.05, -2.28, length = 0.1, lty = 2, col = "black")
+text(5.05, -3.2, expression(xi[j]^"*"), pos = 4)
+
+
+# Add an arrow between the 13th last point and the 13th last point - 1 with text xsi_j
+arrows(x[length(x) - 12], y[length(y) - 12], x[length(x) - 12], y[length(y) - 12]- 0.5, length = 0.1, lty = 2, col = "black")
+text(x[length(x) - 12], y[length(y) - 12] - 0.3, expression(xi[k]), pos = 4)
+
+```
+
+
+Support Vector Regression further expands support Vector Machines from discrete classification to a continuos regression model.
+
+Instead of fitting a hyperplane, here, we are trying to fit a (multidimensional) function $f(x)$ to the data. Similar as before, we draw a margin around the function. However, now the margin $\varepsilon$ is fixed at the start. (Note that $\varepsilon$ here, is not the slack variable anymore, but rather defines the width of the margin! Also, we don't aim to optimize the margin anymore, but instead set it in the beginning). We want to find a function that is as flat as possible, while fitting all points into the required margin. Again, we allow for some slack using slack variables. A wider margin decreases the risk of overfitting, while a smaller margin captures more intricacies of the data. 
+
+Mathematically speaking, want to find a function $f(x)$ with $| f(x_i) - y_i |  \leq \varepsilon$ for all $i$. 
+"Flatness" means how sensitive the function is to change. For a linear function $f(x) = x^\top \beta + b$ this flatness can be expressed through minimizing the norm of the function gradient: $\lVert \beta \rVert$. However, minimizing the expression $\frac{1}{2} \lVert \beta \rVert^2$ leads to the same optimum, while allowing for more elegant mathematical solutions, and is therefore used for computation.
+
+
+Again, we want to allow for some slack, so as before, we are introducing slack variables, this time $\xi_i$ and $\xi_i^\ast$. With $y_i - f(x_i) \leq \varepsilon + \xi_i$ and $f(x_i) - y_i \leq \varepsilon + \xi_i^\ast$ and $\xi_i > 0$, $\xi_i^\ast > 0$ for all $i$. The $\xi_i$ allow for some room for error for margin violations. 
+With those slack variables we want to minimize 
+
+$\frac{1}{2} \lVert \beta \rVert^2 + K \sum_{i=1}^n (\xi_i + \xi_i^\ast)$
+
+where $K$ is fixed and $\beta$, $\xi$ and $\xi^\ast$ are variable.
+We are also introducing the cost $K$ for regularization purposes. It is choosen a priori to determine how strong the tradeoff between flatness and overfitting should be. A larger $K$ leads to a stronger impact of the term, therefore penalizing stronger margin violations more heavily and resulting in a less flat function curve (higher bias, lower variance). Conversly, a smaller $K$ leads to a flatter curve (lower bias, higher variance).
+
+
+```{r, fig.width=10, fig.height=4, out.width='100%', fig.align='center'}
+set.seed(123)
+
+
+x <- seq(-10, 10, 0.5) + rnorm(length(seq(-10, 10, 0.5)), mean = 0, sd = 0.1)
+y <- 1/170 * (x^3 - 3* x^2 - 70*x + 5 + rnorm(length(x), mean = 0, sd = 170))
+
+library(e1071)
+
+epsilon <- 1
+cost <- 0.1
+
+model <- svm(y ~ x, data = data.frame(x = x, y = y), epsilon = epsilon, cost = cost)
+predictedY <- predict(model, data.frame(x = x))
+
+plot(x, y)
+lines(x, predictedY, col = "red")
+
+
+# Add ε-tube
+#polygon(
+#  c(x, rev(x)),
+#  c(predictedY + epsilon, rev(predictedY - epsilon)),
+#  border = NA,
+#  col = rgb(1, 0, 0, 0.15)
+#)
+
+
+
+
+epsilon <- 1
+cost <- 1
+
+model <- svm(y ~ x, data = data.frame(x = x, y = y), epsilon = epsilon, cost = cost)
+predictedY <- predict(model, data.frame(x = x))
+
+# plot(x, y)
+lines(x, predictedY, col = "darkgreen")
+
+
+# Add ε-tube
+#polygon(
+#  c(x, rev(x)),
+#  c(predictedY + epsilon, rev(predictedY - epsilon)),
+#  border = NA,
+#  col = rgb(1, 0, 0, 0.15)
+#)
+
+
+
+
+epsilon <- 1
+cost <- 10000
+
+model <- svm(y ~ x, data = data.frame(x = x, y = y), epsilon = epsilon, cost = cost)
+predictedY <- predict(model, data.frame(x = x))
+
+# plot(x, y)
+lines(x, predictedY, col = "blue")
+
+
+# Add ε-tube
+#polygon(
+#  c(x, rev(x)),
+#  c(predictedY + epsilon, rev(predictedY - epsilon)),
+#  border = NA,
+#  col = rgb(1, 0, 0, 0.15)
+#)
+
+legend("topright", legend = c(" K = 0.1", " K = 1", " K = 10000"), col = c("red", "darkgreen", "blue"), lty = 1)
+title("Support Vector Regression for different costs")
+
+```
+
+
+
+As before, this can be generalized to non-linear functions by transforming features.
+
+
+
+
+
+
+
