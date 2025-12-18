@@ -2,13 +2,12 @@
 title: "Support Vector Regression - Mathematical Overview"
 author: "Luisa Kalkert"
 date: "`r Sys.Date()`"
-output: html_document
+output: pdf_document
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE)
 ```
-
 
 
 To understand how support vector machine are applied for regression, we need to understand the support vector machine for classification first which in turn build upon Support Vector Classifiers.
@@ -17,7 +16,8 @@ To understand how support vector machine are applied for regression, we need to 
 ## Support Vector Classifiers
 
 
-```{r, fig.width=10, fig.height=4, out.width='100%', fig.align='center'}
+```{r, fig.width=10, fig.height=4, out.width='100%', fig.align='center', echo=FALSE, message=FALSE, warning=FALSE}
+# Only plots will be shown; all other output is suppressed.
 
 set.seed(123)
 
@@ -215,7 +215,7 @@ points(x[idx_furthest], y[idx_furthest],
 # Add an arrow (dashed, double sided, between ypred at x = 10 and ypred at x = 10   + 1 )
 arrows(10, predictedY[length(predictedY)], 10, predictedY[length(predictedY)] + epsilon, length = 0.1, lty = 2, col = "black", code = 3)
 # add a text "ε" at the end of the arrow
-text(10.01, predictedY[length(predictedY)] + 1/2 * epsilon, "ε", pos = 4)
+text(10, predictedY[length(predictedY)] + 1/2, expression(epsilon), pos = 4)
 
 # Add an arrow between 5,-5 and 5,-2.5 with text xsi_i star (flipped direction)
 arrows(5.05, -4, 5.05, -2.28, length = 0.1, lty = 2, col = "black")
@@ -229,21 +229,24 @@ text(x[length(x) - 12], y[length(y) - 12] - 0.3, expression(xi[k]), pos = 4)
 ```
 
 
-Support Vector Regression further expands support Vector Machines from discrete classification to a continuos regression model.
+Support Vector Regression expands support Vector Machines from discrete classification to a continuos regression model.
 
-Instead of fitting a hyperplane, here, we are trying to fit a (multidimensional) function $f(x)$ to the data. Similar as before, we draw a margin around the function. However, now the margin $\varepsilon$ is fixed at the start. (Note that $\varepsilon$ here, is not the slack variable anymore, but rather defines the width of the margin! Also, we don't aim to optimize the margin anymore, but instead set it in the beginning). We want to find a function that is as flat as possible, while fitting all points into the required margin. Again, we allow for some slack using slack variables. A wider margin decreases the risk of overfitting, while a smaller margin captures more intricacies of the data. 
+For the regression task, instead of fitting a hyperplane, we are trying to fit a (multidimensional) function $f(x)$ to the data. Similar as in the classification task, we draw a margin around the function. However, now the margin $\varepsilon$ is fixed at the start. (Note that $\varepsilon$ here, is not the slack variable as in Hasties and Tibshirani, but rather defines the width of the margin. Also, we don't aim to optimize the margin anymore, but instead fix it before the computation starts). We want to find a function f(x) that is as flat as possible, while fitting all points into the required margin. Again, we allow for some slack using slack variables. A wider margin decreases the risk of overfitting, while a smaller margin captures more intricacies of the data. 
 
 Mathematically speaking, want to find a function $f(x)$ with $| f(x_i) - y_i |  \leq \varepsilon$ for all $i$. 
-"Flatness" means how sensitive the function is to change. For a linear function $f(x) = x^\top \beta + b$ this flatness can be expressed through minimizing the norm of the function gradient: $\lVert \beta \rVert$. However, minimizing the expression $\frac{1}{2} \lVert \beta \rVert^2$ leads to the same optimum, while allowing for more elegant mathematical solutions, and is therefore used for computation.
+"Flatness" is a measure of how sensitive the function is to change. For a linear function $f(x) = x^\top \beta + b$ increasing this flatness can be expressed through minimizing the norm of the function gradient: $\lVert \beta \rVert$. Minimizing the expression $\frac{1}{2} \lVert \beta \rVert^2$ leads to the same optimum, while allowing for more elegant mathematical solutions, and is therefore used for computation.
 
 
-Again, we want to allow for some slack, so as before, we are introducing slack variables, this time $\xi_i$ and $\xi_i^\ast$. With $y_i - f(x_i) \leq \varepsilon + \xi_i$ and $f(x_i) - y_i \leq \varepsilon + \xi_i^\ast$ and $\xi_i > 0$, $\xi_i^\ast > 0$ for all $i$. The $\xi_i$ allow for some room for error for margin violations. 
+Again, we want to allow for some slack, so as in the SVM for classification, we are introducing slack variables. This time $\xi_i$ and $\xi_i^\ast$. With $y_i - f(x_i) \leq \varepsilon + \xi_i$ and $f(x_i) - y_i \leq \varepsilon + \xi_i^\ast$ and $\xi_i > 0$, $\xi_i^\ast > 0$ for all $i$. The $\xi_i$ allow for some room for error for margin violations. 
 With those slack variables we want to minimize 
 
-$\frac{1}{2} \lVert \beta \rVert^2 + K \sum_{i=1}^n (\xi_i + \xi_i^\ast)$
+$$
+\frac{1}{2} \lVert \beta \rVert^2 + K \sum_{i=1}^n (\xi_i + \xi_i^\ast)
+$$
+
 
 where $K$ is fixed and $\beta$, $\xi$ and $\xi^\ast$ are variable.
-We are also introducing the cost $K$ for regularization purposes. It is choosen a priori to determine how strong the tradeoff between flatness and overfitting should be. A larger $K$ leads to a stronger impact of the term, therefore penalizing stronger margin violations more heavily and resulting in a less flat function curve (higher bias, lower variance). Conversly, a smaller $K$ leads to a flatter curve (lower bias, higher variance).
+The factor $K$ is introduced as cost for regularization purposes. It is choosen a priori to determine how strong the tradeoff between flatness and overfitting should be. A larger $K$ leads to a stronger impact of the term, therefore penalizing stronger margin violations more heavily and resulting in a less flat function curve (higher bias, lower variance). Conversly, a smaller $K$ leads to a flatter curve (lower bias, higher variance).
 
 
 ```{r, fig.width=10, fig.height=4, out.width='100%', fig.align='center'}
